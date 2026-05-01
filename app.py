@@ -116,6 +116,7 @@ def _init_state() -> None:
         "numero_orcamento": "",
         "pdf_orcamento": None,
         "itens_pedido": [],
+        "pedido_em_edicao": False,
         "pedido_confirmado": False,
         "pedido_confirmado_data": None,
         "pedido_quantidades_confirmadas": True,
@@ -124,6 +125,7 @@ def _init_state() -> None:
         "pdf_pedido": None,
         "logo": None,
         "produto_encontrado": None,
+        "active_page": "Importar PDFs",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -191,6 +193,7 @@ def _clear_commercial_on_new_import() -> None:
     st.session_state["numero_orcamento"] = ""
     st.session_state["pdf_orcamento"] = None
     st.session_state["itens_pedido"] = []
+    st.session_state["pedido_em_edicao"] = False
     st.session_state["pedido_confirmado"] = False
     st.session_state["pedido_confirmado_data"] = None
     st.session_state["pedido_quantidades_confirmadas"] = True
@@ -234,6 +237,7 @@ def _render_edit_quote_button(location: str) -> None:
         if st.session_state.get("itens_pedido"):
             st.session_state["pedido_tem_alteracao_pendente"] = True
             st.session_state["pedido_quantidades_confirmadas"] = False
+        st.session_state["active_page"] = "Orçamento"
         st.success("Orçamento liberado para edição. Confirme novamente para gerar PDF ou pedido atualizado.")
         st.rerun()
 
@@ -571,14 +575,22 @@ def _render_quote_tab() -> None:
             mime="application/pdf",
         )
         if st.button("Gerar pedido"):
+            if not st.session_state.get("orcamento_confirmado") or not st.session_state.get("orcamento_confirmado_data"):
+                st.warning("Confirme o orçamento antes de gerar o pedido.")
+                return
+
             quote_data = st.session_state["orcamento_confirmado_data"]
             st.session_state["itens_pedido"] = recalculate_order_items(create_order_from_quote(quote_data), quote_data["percentages"])
+            st.session_state["orcamento_confirmado"] = True
+            st.session_state["orcamento_em_edicao"] = False
+            st.session_state["pedido_em_edicao"] = True
             st.session_state["pedido_confirmado"] = False
             st.session_state["pedido_confirmado_data"] = None
             st.session_state["pedido_quantidades_confirmadas"] = True
             st.session_state["pedido_tem_alteracao_pendente"] = False
             st.session_state["pdf_pedido"] = None
-            st.success("Pedido criado a partir do orçamento confirmado. Acesse a aba Pedido.")
+            st.session_state["active_page"] = "Pedido"
+            st.rerun()
     elif st.session_state["numero_orcamento"] or st.session_state["orcamento_em_edicao"]:
         st.warning("Orçamento em edição. Confirme novamente para gerar PDF ou pedido atualizado.")
 
@@ -663,7 +675,8 @@ def _render_order_tab() -> None:
         st.rerun()
 
     if col_back.button("Voltar para orçamento"):
-        st.info("Use a aba Orçamento para revisar os dados.")
+        st.session_state["active_page"] = "Orçamento"
+        st.rerun()
 
     if st.session_state["pedido_tem_alteracao_pendente"]:
         st.warning("Você alterou quantidades do pedido. Confirme as alterações para continuar.")
@@ -688,6 +701,7 @@ def _render_order_tab() -> None:
                 st.error(error)
         else:
             st.session_state["numero_pedido"] = order_data["numero_pedido"]
+            st.session_state["pedido_em_edicao"] = False
             st.session_state["pedido_confirmado"] = True
             st.session_state["pedido_confirmado_data"] = order_data
             st.session_state["pdf_pedido"] = build_order_pdf(order_data, _logo_bytes())
@@ -712,13 +726,21 @@ _init_state()
 
 st.title("Extrator de Itens de Pedido de Venda")
 
-tab_import, tab_quote, tab_order = st.tabs(["Importar PDFs", "Orçamento", "Pedido"])
+PAGES = ["Importar PDFs", "Orçamento", "Pedido"]
+if st.session_state.get("active_page") not in PAGES:
+    st.session_state["active_page"] = "Importar PDFs"
 
-with tab_import:
+selected_page = st.radio(
+    "Navegação",
+    PAGES,
+    index=PAGES.index(st.session_state["active_page"]),
+    horizontal=True,
+)
+st.session_state["active_page"] = selected_page
+
+if selected_page == "Importar PDFs":
     _render_import_tab()
-
-with tab_quote:
+elif selected_page == "Orçamento":
     _render_quote_tab()
-
-with tab_order:
+elif selected_page == "Pedido":
     _render_order_tab()
