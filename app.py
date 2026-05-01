@@ -9,6 +9,11 @@ from src.excel_writer import build_excel
 from src.extractor import extract_pdf
 from src.models import ITEM_COLUMNS, SUMMARY_COLUMNS
 from src.order import calculate_order_totals, create_order_from_quote, recalculate_order_items, validate_order
+from src.persistence import (
+    get_empty_customer_data,
+    load_last_header_data,
+    save_last_header_data,
+)
 from src.pdf_writer import build_order_pdf, build_quote_pdf
 from src.pricing import MARKUP_KEYS, markup_sequence_has_warning
 from src.product_base import build_product_base, find_product_by_code
@@ -56,36 +61,16 @@ ORDER_DISPLAY_COLUMNS = [
 
 
 def _default_company_data() -> dict:
+    saved_header = load_last_header_data()
     return {
-        "nome_empresa": "",
-        "cnpj_empresa": "",
-        "endereco_empresa": "",
-        "cidade_uf_empresa": "",
-        "telefone": "",
-        "whatsapp": "",
-        "email": "",
-        "instagram": "",
-        "nome_vendedor": "",
+        **saved_header["company_data"],
+        **saved_header["commercial_data"],
         "data_orcamento": date.today(),
-        "validade_dias": 7,
-        "forma_pagamento": "",
-        "prazo_entrega": "",
-        "observacoes_gerais": "",
     }
 
 
 def _default_customer_data() -> dict:
-    return {
-        "nome": "",
-        "cpf": "",
-        "cnpj": "",
-        "telefone": "",
-        "email": "",
-        "endereco": "",
-        "cidade": "",
-        "uf": "",
-        "observacoes": "",
-    }
+    return get_empty_customer_data()
 
 
 def _default_markups() -> dict:
@@ -144,6 +129,45 @@ def _init_state() -> None:
         if key not in st.session_state:
             st.session_state[key] = value
     st.session_state["percentuais_acrescimo"] = _normalize_percentages(st.session_state.get("percentuais_acrescimo"))
+    _sync_header_aliases()
+
+
+def _sync_header_aliases() -> None:
+    company = st.session_state["dados_empresa"]
+    st.session_state["company_data"] = {
+        key: company.get(key, "")
+        for key in (
+            "nome_empresa",
+            "cnpj_empresa",
+            "endereco_empresa",
+            "cidade_uf_empresa",
+            "telefone",
+            "whatsapp",
+            "email",
+            "instagram",
+            "nome_vendedor",
+        )
+    }
+    st.session_state["commercial_data"] = {
+        key: company.get(key, "")
+        for key in (
+            "forma_pagamento",
+            "prazo_entrega",
+            "validade_dias",
+            "observacoes_gerais",
+        )
+    }
+    st.session_state["customer_data"] = st.session_state["dados_cliente"]
+
+
+def _save_header_defaults(company_data: dict, *, show_message: bool = True) -> bool:
+    saved = save_last_header_data(company_data, company_data)
+    if show_message:
+        if saved:
+            st.success("Dados do cabeçalho salvos como padrão.")
+        else:
+            st.error("Não foi possível salvar os dados do cabeçalho como padrão.")
+    return saved
 
 
 def _process_files(uploaded_files) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
@@ -174,6 +198,7 @@ def _clear_commercial_on_new_import() -> None:
     st.session_state["numero_pedido"] = ""
     st.session_state["pdf_pedido"] = None
     st.session_state["produto_encontrado"] = None
+    _sync_header_aliases()
 
 
 def _invalidate_quote() -> None:
@@ -332,8 +357,11 @@ def _render_company_form() -> dict:
             st.success("Logo temporária carregada para orçamento e pedido.")
         if _logo_bytes():
             st.image(_logo_bytes(), width=220)
+        if st.button("Salvar dados do cabeçalho como padrão", key="save_header_company"):
+            _save_header_defaults(data)
 
     st.session_state["dados_empresa"] = data
+    _sync_header_aliases()
     if data != previous:
         _invalidate_quote()
     return data
@@ -355,6 +383,7 @@ def _render_customer_form() -> dict:
         data["endereco"] = st.text_input("Endereço do cliente", value=data.get("endereco", ""))
         data["observacoes"] = st.text_area("Observações do cliente", value=data.get("observacoes", ""), height=80)
     st.session_state["dados_cliente"] = data
+    _sync_header_aliases()
     if data != previous:
         _invalidate_quote()
     return data
@@ -370,7 +399,10 @@ def _render_commercial_terms() -> dict:
         data["prazo_entrega"] = col3.text_input("Prazo de entrega", value=data.get("prazo_entrega", ""))
         data["forma_pagamento"] = st.text_input("Forma de pagamento", value=data.get("forma_pagamento", ""))
         data["observacoes_gerais"] = st.text_area("Observações gerais", value=data.get("observacoes_gerais", ""), height=80)
+        if st.button("Salvar dados do cabeçalho como padrão", key="save_header_commercial"):
+            _save_header_defaults(data)
     st.session_state["dados_empresa"] = data
+    _sync_header_aliases()
     if data != previous:
         _invalidate_quote()
     return data
@@ -528,6 +560,7 @@ def _render_quote_tab() -> None:
             st.session_state["orcamento_em_edicao"] = False
             st.session_state["orcamento_confirmado_data"] = quote_data
             st.session_state["pdf_orcamento"] = build_quote_pdf(quote_data, _logo_bytes())
+            _save_header_defaults(company_data, show_message=False)
             st.success(f"Orçamento {numero} confirmado.")
 
     if st.session_state["orcamento_confirmado"]:
@@ -658,6 +691,7 @@ def _render_order_tab() -> None:
             st.session_state["pedido_confirmado"] = True
             st.session_state["pedido_confirmado_data"] = order_data
             st.session_state["pdf_pedido"] = build_order_pdf(order_data, _logo_bytes())
+            _save_header_defaults(quote_data.get("company_data", {}), show_message=False)
             st.success(f"Pedido {order_data['numero_pedido']} confirmado.")
 
     if blocked_by_quantity:

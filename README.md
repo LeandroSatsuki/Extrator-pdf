@@ -19,6 +19,7 @@ O app usa extração determinística com `pdfplumber`, regex e validações. Nã
 - Confirmação obrigatória quando quantidades do pedido forem alteradas.
 - PDF de pedido com total geral e assinaturas.
 - Logo fixa em `assets/logo.png` com opção de upload temporário.
+- Dados da empresa/vendedor e condições comerciais podem ser salvos como padrão local.
 - Edição/refazer orçamento sem apagar os dados atuais.
 
 ## Requisitos
@@ -53,6 +54,24 @@ assets/logo.png
 ```
 
 Se esse arquivo existir, ele será usado automaticamente nos PDFs de orçamento e pedido. Na aba Orçamento, ainda é possível enviar outra logo temporariamente para substituir a logo fixa durante o uso.
+
+## Dados padrão do cabeçalho
+
+Os dados da empresa/vendedor e as condições comerciais podem ser salvos como padrão pelo botão `Salvar dados do cabeçalho como padrão`.
+
+O app também salva esses dados automaticamente ao confirmar um orçamento ou um pedido. O arquivo local usado é:
+
+```text
+data/last_header_data.json
+```
+
+Esse arquivo não é enviado para o GitHub. Os dados do cliente nunca são salvos como padrão e devem ser preenchidos a cada novo orçamento.
+
+Para limpar os dados padrão, apague:
+
+```text
+data/last_header_data.json
+```
 
 ## Aba Importar PDFs
 

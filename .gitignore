@@ -9,3 +9,4 @@ dist/
 build/
 *.py[cod]
 streamlit*.log
+data/last_header_data.json
