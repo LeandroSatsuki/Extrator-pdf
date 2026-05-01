@@ -533,6 +533,7 @@ def _render_quote_tab() -> None:
     st.header("Orçamento")
     base = st.session_state["base_produtos"]
     st.caption(f"Base temporária: {len(base)} produto(s). O custo da base vem do valor_unitario_original; se ausente, usa valor_base_original.")
+    st.info("Os valores são calculados por métrica. No pedido, a métrica será aplicada conforme a quantidade total de itens selecionados.")
 
     company_data = _render_company_form()
     customer_data = _render_customer_form()
@@ -609,6 +610,7 @@ def _render_order_tab() -> None:
     quote_data = st.session_state["orcamento_confirmado_data"]
     st.write(f"Orçamento confirmado: **{quote_data['numero_orcamento']}**")
     st.write(f"Cliente: **{quote_data['customer_data'].get('nome', '')}**")
+    st.info("A métrica aplicada é calculada pela quantidade total do pedido, não pela quantidade individual de cada item.")
 
     if not st.session_state["itens_pedido"]:
         st.session_state["itens_pedido"] = recalculate_order_items(create_order_from_quote(quote_data), quote_data["percentages"])
@@ -683,8 +685,9 @@ def _render_order_tab() -> None:
 
     totals = calculate_order_totals(st.session_state["itens_pedido"])
     col_qty, col_total = st.columns(2)
-    col_qty.metric("Quantidade total", totals["quantidade_total"])
+    col_qty.metric("Quantidade total do pedido", totals["quantidade_total"])
     col_total.metric("Valor total do pedido", format_brl(totals["valor_total"]))
+    st.metric("Métrica aplicada ao pedido", totals.get("metrica_aplicada") or "-")
 
     blocked_by_quantity = st.session_state["pedido_tem_alteracao_pendente"] or not st.session_state["pedido_quantidades_confirmadas"]
     if st.button("Confirmar pedido", type="primary", disabled=blocked_by_quantity):

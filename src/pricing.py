@@ -19,6 +19,22 @@ METRIC_PRICE_COLUMNS = (
     "preco_acima_20",
 )
 
+METRIC_KEYS_TO_LABELS = {
+    "avulso": "Avulso",
+    "2_a_4": "2 a 4",
+    "5_a_7": "5 a 7",
+    "8_a_19": "8 a 19",
+    "acima_20": "Acima de 20",
+}
+
+METRIC_KEYS_TO_PRICE_COLUMNS = {
+    "avulso": "preco_avulso",
+    "2_a_4": "preco_2_a_4",
+    "5_a_7": "preco_5_a_7",
+    "8_a_19": "preco_8_a_19",
+    "acima_20": "preco_acima_20",
+}
+
 
 def _to_float(value: Any) -> float:
     try:
@@ -38,30 +54,36 @@ def calculate_metric_prices(base_cost: float | int | None, markup_percentages: d
     }
 
 
-def get_metric_by_quantity(quantity: int | float | None) -> str:
-    qty = int(quantity or 0)
+def get_metric_by_total_quantity(total_quantity: int | float | None) -> str:
+    qty = int(total_quantity or 0)
     if qty <= 1:
-        return "Avulso"
+        return "avulso"
     if qty <= 4:
-        return "2 a 4"
+        return "2_a_4"
     if qty <= 7:
-        return "5 a 7"
+        return "5_a_7"
     if qty <= 19:
-        return "8 a 19"
-    return "Acima de 20"
+        return "8_a_19"
+    return "acima_20"
+
+
+def get_metric_label(metric_key: str | None) -> str:
+    return METRIC_KEYS_TO_LABELS.get(str(metric_key or ""), "")
+
+
+def get_price_by_metric(metric_prices: dict[str, Any], metric_key: str | None) -> float:
+    column = METRIC_KEYS_TO_PRICE_COLUMNS.get(str(metric_key or ""))
+    if not column:
+        return 0.0
+    return _to_float(metric_prices.get(column))
+
+
+def get_metric_by_quantity(quantity: int | float | None) -> str:
+    return get_metric_label(get_metric_by_total_quantity(quantity))
 
 
 def get_price_by_quantity(quantity: int | float | None, metric_prices: dict[str, Any]) -> float:
-    metric = get_metric_by_quantity(quantity)
-    if metric == "Avulso":
-        return _to_float(metric_prices.get("preco_avulso"))
-    if metric == "2 a 4":
-        return _to_float(metric_prices.get("preco_2_a_4"))
-    if metric == "5 a 7":
-        return _to_float(metric_prices.get("preco_5_a_7"))
-    if metric == "8 a 19":
-        return _to_float(metric_prices.get("preco_8_a_19"))
-    return _to_float(metric_prices.get("preco_acima_20"))
+    return get_price_by_metric(metric_prices, get_metric_by_total_quantity(quantity))
 
 
 def calculate_item_total(quantity: int | float | None, applied_price: float | int | None) -> float:

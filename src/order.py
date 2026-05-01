@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .pricing import calculate_item_total, get_metric_by_quantity, get_price_by_quantity
+from .pricing import calculate_item_total, get_metric_by_total_quantity, get_metric_label, get_price_by_metric
 
 
 def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
@@ -31,12 +31,16 @@ def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def recalculate_order_items(items: list[dict[str, Any]], percentages: dict[str, Any]) -> list[dict[str, Any]]:
+    selected_total_quantity = sum(int(item.get("quantidade") or 0) for item in items if item.get("selecionar"))
+    metric_key = get_metric_by_total_quantity(selected_total_quantity) if selected_total_quantity > 0 else ""
+    metric_label = get_metric_label(metric_key)
+
     recalculated = []
     for item in items:
         quantity = int(item.get("quantidade") or 0)
-        applied_price = get_price_by_quantity(quantity, item)
+        applied_price = get_price_by_metric(item, metric_key) if item.get("selecionar") and metric_key else 0.0
         updated = dict(item)
-        updated["metrica_aplicada"] = get_metric_by_quantity(quantity)
+        updated["metrica_aplicada"] = metric_label if item.get("selecionar") else ""
         updated["preco_unitario"] = applied_price
         updated["valor_total"] = calculate_item_total(quantity, applied_price)
         recalculated.append(updated)
@@ -45,8 +49,11 @@ def recalculate_order_items(items: list[dict[str, Any]], percentages: dict[str, 
 
 def calculate_order_totals(items: list[dict[str, Any]]) -> dict[str, float | int]:
     selected = [item for item in items if item.get("selecionar")]
+    total_quantity = int(sum(int(item.get("quantidade") or 0) for item in selected))
+    metric_key = get_metric_by_total_quantity(total_quantity) if total_quantity > 0 else ""
     return {
-        "quantidade_total": int(sum(int(item.get("quantidade") or 0) for item in selected)),
+        "quantidade_total": total_quantity,
+        "metrica_aplicada": get_metric_label(metric_key),
         "valor_total": round(sum(float(item.get("valor_total") or 0) for item in selected), 2),
     }
 

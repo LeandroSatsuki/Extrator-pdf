@@ -15,7 +15,7 @@ O app usa extração determinística com `pdfplumber`, regex e validações. Nã
 - Orçamento por métricas: `Avulso`, `2 a 4`, `5 a 7`, `8 a 19`, `Acima de 20`.
 - Acréscimos configuráveis sobre o custo da base.
 - PDF de orçamento com tabela por métrica, sem quantidade.
-- Pedido gerado a partir do orçamento, com quantidade, métrica aplicada e total.
+- Pedido gerado a partir do orçamento, com quantidade, métrica global aplicada e total.
 - Confirmação obrigatória quando quantidades do pedido forem alteradas.
 - PDF de pedido com total geral e assinaturas.
 - Logo fixa em `assets/logo.png` com opção de upload temporário.
@@ -146,12 +146,12 @@ Na tabela do pedido:
 
 - Selecione os itens.
 - Informe ou altere a quantidade.
-- O sistema aplica automaticamente a métrica correta:
-  - quantidade 1: Avulso
-  - 2 a 4: preço 2 a 4
-  - 5 a 7: preço 5 a 7
-  - 8 a 19: preço 8 a 19
-  - 20 ou mais: Acima de 20
+- O sistema soma as quantidades de todos os itens selecionados e aplica a mesma métrica para todos:
+  - total 1: Avulso
+  - total 2 a 4: preço 2 a 4
+  - total 5 a 7: preço 5 a 7
+  - total 8 a 19: preço 8 a 19
+  - total 20 ou mais: Acima de 20
 
 Se qualquer quantidade for alterada, o app bloqueia a confirmação e o PDF do pedido até clicar em `Confirmar alterações de quantidade`.
 
