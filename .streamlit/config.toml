@@ -1,10 +1,17 @@
+[global]
+developmentMode = false
+
 [server]
 headless = true
 address = "127.0.0.1"
 fileWatcherType = "none"
-enableCORS = false
+enableCORS = true
 enableXsrfProtection = true
 maxUploadSize = 50
 
 [browser]
 gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "none"

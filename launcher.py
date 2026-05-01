@@ -159,6 +159,7 @@ def start_streamlit(base_path: Path, port: int) -> subprocess.Popen:
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+    env["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
     env["STREAMLIT_SERVER_ADDRESS"] = APP_HOST
     env["STREAMLIT_SERVER_HEADLESS"] = "true"
     env["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
@@ -264,11 +265,12 @@ def run_streamlit_child() -> int:
         "streamlit",
         "run",
         str(app_file),
+        "--global.developmentMode=false",
         f"--server.address={APP_HOST}",
         f"--server.port={port}",
         "--server.headless=true",
         "--server.fileWatcherType=none",
-        "--server.enableCORS=false",
+        "--server.enableCORS=true",
         "--server.enableXsrfProtection=true",
         "--browser.gatherUsageStats=false",
     ]
