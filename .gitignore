@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+*.pyo
 .env
 .DS_Store
 .streamlit/secrets.toml
@@ -9,4 +10,7 @@ dist/
 build/
 *.py[cod]
 streamlit*.log
+logs/
+*.log
+*.spec
 data/last_header_data.json

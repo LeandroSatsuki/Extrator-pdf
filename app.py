@@ -19,6 +19,7 @@ from src.pricing import MARKUP_KEYS, markup_sequence_has_warning
 from src.product_base import build_product_base, find_products_by_code
 from src.quote import calculate_quote_totals, create_quote_item, recalculate_quote_items, validate_quote
 from src.utils import (
+    configure_file_logging,
     format_brl,
     format_weight,
     generate_order_number,
@@ -29,6 +30,12 @@ from src.utils import (
 
 
 st.set_page_config(page_title="Extrator de Itens de Pedido de Venda", layout="wide")
+
+
+LOGGER = configure_file_logging("extrator_pdf.app")
+MAX_PDF_FILES = 5
+MAX_PDF_SIZE_MB = 50
+MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
 
 
 QUOTE_DISPLAY_COLUMNS = [
@@ -178,7 +185,26 @@ def _process_files(uploaded_files) -> tuple[pd.DataFrame, pd.DataFrame, list[str
     summaries = []
     warnings = []
     for uploaded_file in uploaded_files:
-        result = extract_pdf(uploaded_file.getvalue(), uploaded_file.name)
+        try:
+            result = extract_pdf(uploaded_file.getvalue(), uploaded_file.name)
+        except Exception as exc:
+            LOGGER.exception("Falha inesperada ao processar o arquivo %s", getattr(uploaded_file, "name", "desconhecido"))
+            result = {
+                "items": [],
+                "summary": {
+                    "arquivo_origem": getattr(uploaded_file, "name", "arquivo_desconhecido.pdf"),
+                    "numero_pedido": "",
+                    "cliente": "",
+                    "faturamento": "",
+                    "linhas_extraidas": 0,
+                    "linhas_ok": 0,
+                    "linhas_conferir": 0,
+                    "itens_rodape": None,
+                    "status_pdf": "ERRO",
+                    "observacoes_pdf": f"Erro inesperado ao processar o PDF: {exc}",
+                },
+                "warnings": [f"Falha ao processar {getattr(uploaded_file, 'name', 'o arquivo')}: {exc}"],
+            }
         all_items.extend(result["items"])
         summaries.append(result["summary"])
         warnings.extend(result["warnings"])
@@ -276,21 +302,36 @@ def _render_import_tab() -> None:
     st.header("Importar PDFs")
     uploaded_files = st.file_uploader("Selecione até 5 arquivos PDF", type=["pdf"], accept_multiple_files=True)
 
-    too_many_files = len(uploaded_files) > 5
+    too_many_files = len(uploaded_files) > MAX_PDF_FILES
+    oversized_files = [
+        f"{uploaded_file.name} ({uploaded_file.size / (1024 * 1024):.1f} MB)"
+        for uploaded_file in uploaded_files
+        if getattr(uploaded_file, "size", 0) > MAX_PDF_SIZE_BYTES
+    ]
+    has_oversized_files = bool(oversized_files)
     if too_many_files:
-        st.error("Selecione no máximo 5 arquivos PDF.")
+        st.error(f"Selecione no máximo {MAX_PDF_FILES} arquivos PDF.")
+    if has_oversized_files:
+        st.error(
+            "Cada PDF deve ter no máximo 50 MB. Arquivos acima do limite: "
+            + ", ".join(oversized_files)
+        )
 
-    if st.button("Processar PDFs", type="primary", disabled=not uploaded_files or too_many_files):
-        with st.spinner("Processando PDFs..."):
-            items_df, summary_df, warnings = _process_files(uploaded_files)
-            st.session_state["items_df"] = items_df
-            st.session_state["summary_df"] = summary_df
-            st.session_state["warnings"] = warnings
-            st.session_state["excel_data"] = build_excel(items_df, summary_df)
-            st.session_state["pdfs_processados"] = True
-            st.session_state["extracao_confirmada"] = False
-            st.session_state["base_produtos"] = pd.DataFrame()
-            _clear_commercial_on_new_import()
+    if st.button("Processar PDFs", type="primary", disabled=not uploaded_files or too_many_files or has_oversized_files):
+        try:
+            with st.spinner("Processando PDFs..."):
+                items_df, summary_df, warnings = _process_files(uploaded_files)
+                st.session_state["items_df"] = items_df
+                st.session_state["summary_df"] = summary_df
+                st.session_state["warnings"] = warnings
+                st.session_state["excel_data"] = build_excel(items_df, summary_df).getvalue()
+                st.session_state["pdfs_processados"] = True
+                st.session_state["extracao_confirmada"] = False
+                st.session_state["base_produtos"] = pd.DataFrame()
+                _clear_commercial_on_new_import()
+        except Exception as exc:
+            LOGGER.exception("Erro ao processar o lote de PDFs")
+            st.error(f"Ocorreu um erro ao processar os PDFs: {exc}")
 
     items_df = st.session_state["items_df"]
     summary_df = st.session_state["summary_df"]
@@ -603,7 +644,7 @@ def _render_quote_tab() -> None:
             st.session_state["orcamento_confirmado"] = True
             st.session_state["orcamento_em_edicao"] = False
             st.session_state["orcamento_confirmado_data"] = quote_data
-            st.session_state["pdf_orcamento"] = build_quote_pdf(quote_data, _logo_bytes())
+            st.session_state["pdf_orcamento"] = build_quote_pdf(quote_data, _logo_bytes()).getvalue()
             _save_header_defaults(company_data, show_message=False)
             st.success(f"Orçamento {numero} confirmado.")
 
@@ -746,7 +787,7 @@ def _render_order_tab() -> None:
             st.session_state["pedido_em_edicao"] = False
             st.session_state["pedido_confirmado"] = True
             st.session_state["pedido_confirmado_data"] = order_data
-            st.session_state["pdf_pedido"] = build_order_pdf(order_data, _logo_bytes())
+            st.session_state["pdf_pedido"] = build_order_pdf(order_data, _logo_bytes()).getvalue()
             _save_header_defaults(quote_data.get("company_data", {}), show_message=False)
             st.success(f"Pedido {order_data['numero_pedido']} confirmado.")
 

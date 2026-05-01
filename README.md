@@ -30,6 +30,7 @@ O app usa extração determinística com `pdfplumber`, regex e validações. Nã
 - pandas
 - openpyxl
 - reportlab
+- pyinstaller
 
 ## Instalação
 
@@ -55,14 +56,28 @@ assets/logo.png
 
 Se esse arquivo existir, ele será usado automaticamente nos PDFs de orçamento e pedido. Na aba Orçamento, ainda é possível enviar outra logo temporariamente para substituir a logo fixa durante o uso.
 
+Na distribuição Windows em `dist\ExtratorPDF\`, a logo padrão também pode ficar em:
+
+```text
+dist\ExtratorPDF\assets\logo.png
+```
+
 ## Dados padrão do cabeçalho
 
 Os dados da empresa/vendedor e as condições comerciais podem ser salvos como padrão pelo botão `Salvar dados do cabeçalho como padrão`.
 
-O app também salva esses dados automaticamente ao confirmar um orçamento ou um pedido. O arquivo local usado é:
+O app também salva esses dados automaticamente ao confirmar um orçamento ou um pedido.
+
+Em desenvolvimento, o arquivo local usado é:
 
 ```text
 data/last_header_data.json
+```
+
+No executável Windows, os dados persistentes ficam em:
+
+```text
+%APPDATA%\ExtratorPDF\data\last_header_data.json
 ```
 
 Esse arquivo não é enviado para o GitHub. Os dados do cliente nunca são salvos como padrão e devem ser preenchidos a cada novo orçamento.
@@ -71,6 +86,12 @@ Para limpar os dados padrão, apague:
 
 ```text
 data/last_header_data.json
+```
+
+ou, no executável Windows:
+
+```text
+%APPDATA%\ExtratorPDF\data\last_header_data.json
 ```
 
 ## Aba Importar PDFs
@@ -173,3 +194,55 @@ O cabeçalho das duas abas tem fundo escuro, fonte branca, negrito, filtro autom
 - Produtos duplicados são consolidados por código.
 - Se o mesmo código aparecer com descrição, peso ou valor divergente, o primeiro registro é mantido e o produto recebe observação de divergência.
 - PDFs escaneados ou sem texto pesquisável são sinalizados como erro; OCR não é executado nesta etapa.
+- Em desenvolvimento, os logs ficam em `logs/app.log`.
+- No executável Windows, os logs ficam em `%APPDATA%\ExtratorPDF\logs\app.log`.
+- O app local roda em `127.0.0.1` e não expõe a interface na rede.
+
+## Como gerar o executável Windows
+
+Crie o ambiente e instale as dependências:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Gere o executável recomendado:
+
+```powershell
+build_scripts\build_windows_onedir.bat
+```
+
+Resultado esperado:
+
+```text
+dist\ExtratorPDF\ExtratorPDF.exe
+```
+
+Para entregar ao cliente, compacte a pasta inteira:
+
+```text
+dist\ExtratorPDF\
+```
+
+O cliente só precisa extrair a pasta e clicar em:
+
+```text
+ExtratorPDF.exe
+```
+
+Comportamento do executável:
+
+- Não precisa instalar Python.
+- Não precisa abrir terminal.
+- O navegador padrão abre automaticamente.
+- O app roda localmente em `http://127.0.0.1:PORTA`.
+- O app não expõe dados na internet.
+- O launcher escolhe uma porta livre automaticamente e grava logs simples.
+
+Existe também um build opcional em `onefile`, mas o recomendado para distribuição é o `onedir`:
+
+```powershell
+build_scripts\build_windows_onefile.bat
+```

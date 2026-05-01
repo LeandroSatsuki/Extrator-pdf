@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .utils import get_data_dir
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-LAST_HEADER_FILE = DATA_DIR / "last_header_data.json"
+
+def _get_last_header_file() -> Path:
+    return get_data_dir() / "last_header_data.json"
 
 
 COMPANY_TO_JSON = {
@@ -72,11 +74,12 @@ def load_last_header_data() -> dict[str, dict[str, Any]]:
         "commercial_data": get_default_commercial_data(),
     }
 
-    if not LAST_HEADER_FILE.exists():
+    last_header_file = _get_last_header_file()
+    if not last_header_file.exists():
         return defaults
 
     try:
-        raw = json.loads(LAST_HEADER_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(last_header_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError):
         return defaults
 
@@ -117,8 +120,9 @@ def save_last_header_data(company_data: dict[str, Any], commercial_data: dict[st
     }
 
     try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        LAST_HEADER_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        last_header_file = _get_last_header_file()
+        last_header_file.parent.mkdir(parents=True, exist_ok=True)
+        last_header_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:
         return False
 
