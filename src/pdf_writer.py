@@ -310,8 +310,6 @@ def build_quote_pdf(quote_data: dict[str, Any], logo_file: bytes | None = None) 
     story.append(_quote_items_table(items))
     story.append(Spacer(1, 0.3 * cm))
     story.append(_paragraph(f"<b>Total de modelos orçados:</b> {totals.get('total_modelos', len(items))}", styles["Line"]))
-    story.append(_paragraph("Observação: Os valores acima são calculados por faixa de quantidade, conforme a métrica selecionada no pedido.", styles["Small"]))
-    story.append(Spacer(1, 0.35 * cm))
     story.append(_paragraph("Este orçamento apresenta valores por faixa de quantidade. O valor final será calculado no pedido conforme a quantidade escolhida.", styles["Small"]))
     return _build_document("ORÇAMENTO", quote_data.get("numero_orcamento", ""), story)
 
