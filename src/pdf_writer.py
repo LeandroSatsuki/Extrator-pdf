@@ -16,6 +16,14 @@ from .utils import format_brl, format_date_br, safe_text
 DARK = colors.HexColor("#1F1F1F")
 MID = colors.HexColor("#777777")
 LIGHT_GRID = colors.HexColor("#D9D9D9")
+PAGE_WIDTH, PAGE_HEIGHT = A4
+PAGE_MARGIN_LEFT = 40
+PAGE_MARGIN_RIGHT = 40
+PAGE_MARGIN_TOP = 46
+PAGE_MARGIN_BOTTOM = 40
+USABLE_WIDTH = PAGE_WIDTH - PAGE_MARGIN_LEFT - PAGE_MARGIN_RIGHT
+LOGO_MAX_WIDTH = 12.15 * cm
+LOGO_MAX_HEIGHT = 4.05 * cm
 
 
 def _styles():
@@ -44,7 +52,7 @@ def _join_values(*parts: tuple[str, Any]) -> str:
 
 
 def _horizontal_line(color=MID, height: float = 0.04) -> Table:
-    table = Table([[""]], colWidths=[17.0 * cm], rowHeights=[height * cm])
+    table = Table([[""]], colWidths=[USABLE_WIDTH], rowHeights=[height * cm])
     table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), color)]))
     return table
 
@@ -53,7 +61,7 @@ def draw_logo(logo_file: bytes | None) -> Image | None:
     if not logo_file:
         return None
     try:
-        image = Image(BytesIO(logo_file), width=16.2 * cm, height=5.4 * cm, kind="proportional")
+        image = Image(BytesIO(logo_file), width=LOGO_MAX_WIDTH, height=LOGO_MAX_HEIGHT, kind="proportional")
         image.hAlign = "LEFT"
         return image
     except Exception:
@@ -72,7 +80,7 @@ def _document_header(title: str, number: str, date_value: Any, logo_file: bytes 
         _paragraph(f"<b>Número:</b> {safe_text(number)}", styles["RightSmall"]),
         _paragraph(f"<b>Data:</b> {format_date_br(date_value)}", styles["RightSmall"]),
     ]
-    table = Table([[title_block]], colWidths=[17.0 * cm])
+    table = Table([[title_block]], colWidths=[USABLE_WIDTH])
     table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
     story.extend([table, _horizontal_line(DARK, 0.05), Spacer(1, 0.18 * cm)])
     return story
@@ -115,7 +123,7 @@ def draw_company_customer_header(company: dict[str, Any], customer: dict[str, An
     ]
     data.extend([[company_lines[index], customer_lines[index]] for index in range(max_rows)])
 
-    table = Table(data, colWidths=[8.4 * cm, 8.4 * cm])
+    table = Table(data, colWidths=[USABLE_WIDTH / 2, USABLE_WIDTH / 2])
     table.setStyle(
         TableStyle(
             [
@@ -180,7 +188,7 @@ def _details_table(title: str, rows: list[list[Paragraph]]) -> Table:
     styles = _styles()
     data = [[_paragraph(f"<b>{title}</b>", styles["BlockTitle"]), "", ""]]
     data.extend(rows)
-    table = Table(data, colWidths=[5.6 * cm, 5.6 * cm, 5.6 * cm])
+    table = Table(data, colWidths=[USABLE_WIDTH / 3, USABLE_WIDTH / 3, USABLE_WIDTH / 3])
     table.setStyle(
         TableStyle(
             [
@@ -201,7 +209,7 @@ def _details_table(title: str, rows: list[list[Paragraph]]) -> Table:
 
 
 def build_items_table(data: list[list[Any]], col_widths: list[float]) -> Table:
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table = Table(data, colWidths=_scale_widths(col_widths), repeatRows=1)
     table.setStyle(
         TableStyle(
             [
@@ -218,6 +226,14 @@ def build_items_table(data: list[list[Any]], col_widths: list[float]) -> Table:
         )
     )
     return table
+
+
+def _scale_widths(widths: list[float]) -> list[float]:
+    total = sum(widths)
+    if not total:
+        return widths
+    factor = USABLE_WIDTH / total
+    return [width * factor for width in widths]
 
 
 def _quote_items_table(items: list[dict[str, Any]]) -> Table:
@@ -267,10 +283,10 @@ def _build_document(title: str, number: str, story: list[Any]) -> BytesIO:
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=1.4 * cm,
-        leftMargin=1.4 * cm,
-        topMargin=1.0 * cm,
-        bottomMargin=1.2 * cm,
+        rightMargin=PAGE_MARGIN_RIGHT,
+        leftMargin=PAGE_MARGIN_LEFT,
+        topMargin=PAGE_MARGIN_TOP,
+        bottomMargin=PAGE_MARGIN_BOTTOM,
         title=f"{title} {number}",
     )
     doc.build(story)
