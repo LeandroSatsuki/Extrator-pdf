@@ -16,7 +16,7 @@ from src.persistence import (
 )
 from src.pdf_writer import build_order_pdf, build_quote_pdf
 from src.pricing import MARKUP_KEYS, markup_sequence_has_warning
-from src.product_base import build_product_base, find_product_by_code
+from src.product_base import build_product_base, find_products_by_code
 from src.quote import calculate_quote_totals, create_quote_item, recalculate_quote_items, validate_quote
 from src.utils import (
     format_brl,
@@ -125,6 +125,7 @@ def _init_state() -> None:
         "pdf_pedido": None,
         "logo": None,
         "produto_encontrado": None,
+        "produtos_encontrados": [],
         "active_page": "Importar PDFs",
     }
     for key, value in defaults.items():
@@ -201,6 +202,7 @@ def _clear_commercial_on_new_import() -> None:
     st.session_state["numero_pedido"] = ""
     st.session_state["pdf_pedido"] = None
     st.session_state["produto_encontrado"] = None
+    st.session_state["produtos_encontrados"] = []
     _sync_header_aliases()
 
 
@@ -224,6 +226,21 @@ def _invalidate_quote() -> None:
 
 def _logo_bytes() -> bytes | None:
     return get_logo_source(st.session_state.get("logo"))
+
+
+def _format_product_option(product: dict) -> str:
+    try:
+        weight_value = product.get("peso_g")
+        weight = f"{float(weight_value):.2f}".replace(".", ",") if weight_value not in (None, "") else ""
+    except (TypeError, ValueError):
+        weight = ""
+    classification = product.get("classificacao") or ""
+    weight_text = f"{weight}g" if weight else "peso não informado"
+    classification_text = f"Classificação {classification}" if classification else "Classificação não informada"
+    return (
+        f"{product.get('produto', '')} - {product.get('descricao', '')} - "
+        f"{weight_text} - {product.get('unidade', '')} - {classification_text}"
+    )
 
 
 def _render_edit_quote_button(location: str) -> None:
@@ -436,21 +453,43 @@ def _render_percentages() -> dict:
 def _render_product_search(percentages: dict) -> None:
     st.subheader("Busca de item")
     col_code, col_search = st.columns([3, 1])
-    code = col_code.text_input("Código do item", key="codigo_busca_produto")
+    code = col_code.text_input(
+        "Código do item",
+        help="Digite o código completo ou os 5 últimos dígitos.",
+        key="codigo_busca_produto",
+    )
     if col_search.button("Buscar item"):
-        product = find_product_by_code(st.session_state["base_produtos"], code)
-        if not product:
+        matches = find_products_by_code(st.session_state["base_produtos"], code)
+        st.session_state["produtos_encontrados"] = matches
+        if not matches:
             st.session_state["produto_encontrado"] = None
             st.error("Produto não encontrado na base importada.")
-        else:
+        elif len(matches) == 1:
+            product = matches[0]
             st.session_state["produto_encontrado"] = product
-            if product.get("tem_divergencia"):
-                st.warning("Produto encontrado em mais de um PDF com dados divergentes.")
             st.success("Produto encontrado.")
+        else:
+            st.session_state["produto_encontrado"] = None
 
-    product = st.session_state.get("produto_encontrado")
+    matches = st.session_state.get("produtos_encontrados") or []
+    if len(matches) > 1:
+        st.info("Foram encontrados vários produtos com esses 5 últimos dígitos. Selecione o item correto.")
+        selected_index = st.selectbox(
+            "Produtos encontrados",
+            options=list(range(len(matches))),
+            format_func=lambda index: _format_product_option(matches[index]),
+            key="produto_ambiguo_selecionado",
+        )
+        product = matches[selected_index]
+        st.session_state["produto_encontrado"] = product
+    else:
+        product = st.session_state.get("produto_encontrado")
+
     if not product:
         return
+
+    if product.get("tem_divergencia"):
+        st.warning("Produto encontrado em mais de um PDF com dados divergentes.")
 
     preview = create_quote_item(product, percentages)
     st.dataframe(

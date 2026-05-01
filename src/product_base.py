@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -81,12 +82,31 @@ def build_product_base(items_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(products, columns=PRODUCT_COLUMNS)
 
 
-def find_product_by_code(product_base: pd.DataFrame, code: str) -> dict[str, Any] | None:
-    if product_base.empty:
-        return None
+def normalize_product_code(value: Any) -> str:
+    return re.sub(r"\D", "", str(value or "").strip())
 
-    normalized = str(code or "").strip()
-    matches = product_base[product_base["produto"].astype(str).str.strip().eq(normalized)]
+
+def find_products_by_code(product_base: pd.DataFrame, search_code: str) -> list[dict[str, Any]]:
+    if product_base.empty:
+        return []
+
+    normalized = normalize_product_code(search_code)
+    if not normalized:
+        return []
+
+    product_codes = product_base["produto"].astype(str).map(normalize_product_code)
+    matches = product_base[product_codes.eq(normalized)]
+    if matches.empty and len(normalized) == 5:
+        matches = product_base[product_codes.str.endswith(normalized, na=False)]
+
     if matches.empty:
+        return []
+
+    return matches.to_dict("records")
+
+
+def find_product_by_code(product_base: pd.DataFrame, code: str) -> dict[str, Any] | None:
+    matches = find_products_by_code(product_base, code)
+    if len(matches) != 1:
         return None
-    return matches.iloc[0].to_dict()
+    return matches[0]
