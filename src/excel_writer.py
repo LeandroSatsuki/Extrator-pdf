@@ -4,13 +4,13 @@ from io import BytesIO
 from typing import Iterable
 
 import pandas as pd
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 
 YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFF2CC")
 RED_FILL = PatternFill(fill_type="solid", fgColor="F4CCCC")
-HEADER_FILL = PatternFill(fill_type="solid", fgColor="D9EAD3")
+HEADER_FILL = PatternFill(fill_type="solid", fgColor="1F4E78")
 
 
 def build_excel(items_df: pd.DataFrame, summary_df: pd.DataFrame) -> BytesIO:
@@ -51,8 +51,9 @@ def _format_sheet(ws, df: pd.DataFrame) -> None:
     ws.auto_filter.ref = ws.dimensions
 
     for cell in ws[1]:
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for column_index, column_name in enumerate(df.columns, start=1):
         letter = get_column_letter(column_index)

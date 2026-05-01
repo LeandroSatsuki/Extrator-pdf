@@ -1,8 +1,8 @@
 # Extrator-pdf
 
-Aplicativo web local em Python para extrair itens de PDFs de Pedido de Venda, consolidar uma base temporária de produtos, criar orçamentos comerciais, gerar pedidos e baixar arquivos Excel/PDF.
+Aplicativo web local em Python para extrair itens de PDFs de Pedido de Venda, consolidar uma base temporária de produtos, montar orçamentos por métricas de preço, gerar pedidos por quantidade e baixar arquivos Excel/PDF.
 
-O app usa extração determinística com `pdfplumber`, regex e validações. Não usa OCR, banco de dados, APIs externas ou IA para interpretar campos. Se um PDF não tiver texto pesquisável, ele é marcado como erro e o usuário é avisado de que OCR será necessário futuramente.
+O app usa extração determinística com `pdfplumber`, regex e validações. Não usa OCR, banco de dados, APIs externas ou IA para interpretar campos.
 
 ## Funcionalidades
 
@@ -10,15 +10,16 @@ O app usa extração determinística com `pdfplumber`, regex e validações. Nã
 - Extração de cabeçalho e itens da tabela de Pedido de Venda.
 - Validação por rodapé com o campo `Itens:`.
 - Cálculo de confiança por linha extraída.
-- Geração de Excel com abas `Itens` e `Resumo`.
-- Consolidação dos itens extraídos em uma base temporária de produtos.
-- Criação de orçamento por busca de código de produto.
-- Percentuais de acréscimo por faixa de quantidade.
-- PDF de orçamento com logo opcional.
-- Geração de pedido a partir do orçamento confirmado.
-- Seleção e ajuste de itens no pedido.
-- PDF de pedido com logo opcional e campos de assinatura.
-- Opção de refazer orçamento mantendo base importada, dados da empresa, logo e percentuais.
+- Excel com abas `Itens` e `Resumo`.
+- Base temporária de produtos consolidada por código.
+- Orçamento por métricas: `Avulso`, `2 a 4`, `5 a 7`, `8 a 19`, `Acima de 20`.
+- Acréscimos configuráveis sobre o custo da base.
+- PDF de orçamento com tabela por métrica, sem quantidade.
+- Pedido gerado a partir do orçamento, com quantidade, métrica aplicada e total.
+- Confirmação obrigatória quando quantidades do pedido forem alteradas.
+- PDF de pedido com total geral e assinaturas.
+- Logo fixa em `assets/logo.png` com opção de upload temporário.
+- Edição/refazer orçamento sem apagar os dados atuais.
 
 ## Requisitos
 
@@ -43,6 +44,16 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Logo fixa
+
+Para deixar uma logo fixa no sistema, coloque o arquivo em:
+
+```text
+assets/logo.png
+```
+
+Se esse arquivo existir, ele será usado automaticamente nos PDFs de orçamento e pedido. Na aba Orçamento, ainda é possível enviar outra logo temporariamente para substituir a logo fixa durante o uso.
+
 ## Aba Importar PDFs
 
 1. Selecione até 5 PDFs.
@@ -56,85 +67,89 @@ Após confirmar a extração, os itens viram uma base temporária de produtos pa
 
 ## Aba Orçamento
 
-Preencha os dados da empresa/vendedor, faça upload opcional da logo, informe os dados do cliente e configure os percentuais:
+Os campos de cabeçalho ficam em seções minimizáveis:
 
-- Acréscimo 1 a 3 unidades
-- Acréscimo 4 a 6 unidades
-- Acréscimo 7 a 9 unidades
-- Acréscimo acima de 10 unidades
+- Dados da empresa / vendedor
+- Dados do cliente
+- Condições comerciais
+- Percentuais de acréscimo
+
+O orçamento não usa quantidade. Ele apresenta uma tabela de preços por métrica/faixa.
 
 Para adicionar item:
 
-1. Digite o código do produto.
-2. Informe a quantidade desejada.
-3. Clique em `Buscar item`.
-4. Confira descrição, peso, unidade, classificação e preços por faixa.
-5. Clique em `Adicionar item`.
+1. Digite o código do item.
+2. Clique em `Buscar item`.
+3. Confira descrição, peso, unidade, classificação, custo base e preços calculados.
+4. Clique em `Adicionar ao orçamento`.
 
-O preço aplicado é escolhido automaticamente pela quantidade:
+As métricas do orçamento são:
 
-- 1 a 3 unidades: preço 1 a 3
-- 4 a 6 unidades: preço 4 a 6
-- 7 a 9 unidades: preço 7 a 9
-- 10 ou mais unidades: preço acima de 10
+- Avulso
+- 2 a 4
+- 5 a 7
+- 8 a 19
+- Acima de 20
 
-Depois de revisar, clique em `Confirmar orçamento`. O PDF do orçamento fica disponível para download. Se percentuais ou itens forem alterados depois da confirmação, o orçamento precisa ser confirmado novamente.
+Os percentuais são acréscimos sobre o custo da base, não descontos. O custo usa preferencialmente `valor_unitario_original`; se ausente, usa `valor_base_original`.
+
+Fórmula:
+
+```text
+preço da métrica = valor_custo_base * (1 + percentual_acrescimo / 100)
+```
+
+Se uma faixa maior tiver acréscimo maior que a faixa anterior, o app mostra o aviso:
+
+```text
+Atenção: normalmente o acréscimo diminui conforme a quantidade aumenta.
+```
+
+Esse aviso não bloqueia o orçamento.
+
+## PDF do orçamento
+
+O PDF mostra:
+
+- Logo no topo, se existir.
+- Dados da empresa, cliente e condições em linhas simples.
+- Tabela com Código, Descrição, Avulso, 2 a 4, 5 a 7, 8 a 19, Acima de 20.
+- Total de modelos orçados.
+
+O PDF do orçamento não mostra quantidade, preço aplicado nem valor total geral.
 
 ## Aba Pedido
 
-A aba Pedido exige um orçamento confirmado.
+O pedido só fica disponível após confirmar o orçamento.
 
-1. Gere o pedido a partir do orçamento.
-2. Selecione os itens que entrarão no pedido.
-3. Ajuste a quantidade final, se necessário.
-4. Clique em `Recalcular pedido`.
-5. Clique em `Confirmar pedido`.
-6. Baixe o PDF do pedido.
+Na tabela do pedido:
 
-Se a quantidade do pedido mudar, o preço aplicado é recalculado usando os mesmos percentuais do orçamento.
+- Selecione os itens.
+- Informe ou altere a quantidade.
+- O sistema aplica automaticamente a métrica correta:
+  - quantidade 1: Avulso
+  - 2 a 4: preço 2 a 4
+  - 5 a 7: preço 5 a 7
+  - 8 a 19: preço 8 a 19
+  - 20 ou mais: Acima de 20
 
-## Refazer orçamento
+Se qualquer quantidade for alterada, o app bloqueia a confirmação e o PDF do pedido até clicar em `Confirmar alterações de quantidade`.
 
-Use `Refazer orçamento` para limpar:
+## Editar orçamento
 
-- Dados do cliente
-- Itens do orçamento
-- Orçamento confirmado
-- Pedido gerado
+O botão `Editar orçamento / Refazer orçamento` não apaga dados. Ele apenas libera o orçamento atual para edição, mantém itens, cliente, empresa, logo e percentuais, invalida o PDF antigo e exige nova confirmação antes de gerar PDF ou pedido atualizado.
 
-São mantidos:
+## Excel
 
-- Base de produtos importada dos PDFs
-- Dados da empresa/vendedor
-- Logo carregada
-- Percentuais de acréscimo
+A planilha gerada possui abas:
 
-Antes de limpar, marque `Confirmo que desejo refazer o orçamento`.
+- `Itens`
+- `Resumo`
 
-## Colunas do Excel
+O cabeçalho das duas abas tem fundo escuro, fonte branca, negrito, filtro automático e primeira linha congelada.
 
-A aba `Itens` contém os dados extraídos dos PDFs, incluindo `linha_original` e `pagina` para auditoria.
+## Observações técnicas
 
-A aba `Resumo` contém arquivo de origem, número do pedido, cliente, faturamento, linhas extraídas, linhas OK, linhas para conferir, itens do rodapé, status do PDF e observações.
-
-## Confiança da extração
-
-Cada linha recebe pontuação de 0 a 100:
-
-- Regex completa: 40 pontos
-- Produto numérico com 8 a 12 dígitos: 10 pontos
-- Peso válido: 10 pontos
-- Quantidade válida: 10 pontos
-- Unidade reconhecida: 5 pontos
-- Valores monetários convertidos: 10 pontos
-- Total confere com quantidade x valor unitário: 10 pontos
-- Classificação identificada: 5 pontos
-
-Linhas com confiança maior ou igual a 90 ficam como `OK`. Linhas abaixo de 90 permanecem no Excel como `CONFERIR` com observação.
-
-## Observações
-
-- O valor original extraído do PDF é usado como base interna de cálculo.
-- O app não inventa dados ausentes.
 - Produtos duplicados são consolidados por código.
 - Se o mesmo código aparecer com descrição, peso ou valor divergente, o primeiro registro é mantido e o produto recebe observação de divergência.
+- PDFs escaneados ou sem texto pesquisável são sinalizados como erro; OCR não é executado nesta etapa.

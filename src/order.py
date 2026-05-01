@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .pricing import calculate_item_total, calculate_price_tiers, get_applied_price
+from .pricing import calculate_item_total, get_metric_by_quantity, get_price_by_quantity
 
 
 def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
@@ -11,13 +11,20 @@ def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
             "selecionar": bool(item.get("selecionar", True)),
             "produto": item.get("produto", ""),
             "descricao": item.get("descricao", ""),
-            "quantidade_orcamento": int(item.get("quantidade") or 0),
-            "quantidade_pedido": int(item.get("quantidade") or 0),
+            "quantidade": 1,
             "unidade": item.get("unidade", ""),
-            "preco_aplicado": item.get("preco_aplicado", 0),
-            "valor_total": item.get("valor_total", 0),
+            "metrica_aplicada": "Avulso",
+            "preco_unitario": item.get("preco_avulso", 0),
+            "valor_total": item.get("preco_avulso", 0),
             "observacao": item.get("observacao", ""),
+            "valor_custo_base": item.get("valor_custo_base", 0),
             "valor_unitario_original": item.get("valor_unitario_original", 0),
+            "valor_base_original": item.get("valor_base_original", 0),
+            "preco_avulso": item.get("preco_avulso", 0),
+            "preco_2_a_4": item.get("preco_2_a_4", 0),
+            "preco_5_a_7": item.get("preco_5_a_7", 0),
+            "preco_8_a_19": item.get("preco_8_a_19", 0),
+            "preco_acima_20": item.get("preco_acima_20", 0),
         }
         for item in quote.get("items", [])
     ]
@@ -26,11 +33,11 @@ def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
 def recalculate_order_items(items: list[dict[str, Any]], percentages: dict[str, Any]) -> list[dict[str, Any]]:
     recalculated = []
     for item in items:
-        quantity = int(item.get("quantidade_pedido") or 0)
-        tiers = calculate_price_tiers(item.get("valor_unitario_original"), percentages)
-        applied_price = get_applied_price(quantity, tiers)
+        quantity = int(item.get("quantidade") or 0)
+        applied_price = get_price_by_quantity(quantity, item)
         updated = dict(item)
-        updated["preco_aplicado"] = applied_price
+        updated["metrica_aplicada"] = get_metric_by_quantity(quantity)
+        updated["preco_unitario"] = applied_price
         updated["valor_total"] = calculate_item_total(quantity, applied_price)
         recalculated.append(updated)
     return recalculated
@@ -39,7 +46,7 @@ def recalculate_order_items(items: list[dict[str, Any]], percentages: dict[str, 
 def calculate_order_totals(items: list[dict[str, Any]]) -> dict[str, float | int]:
     selected = [item for item in items if item.get("selecionar")]
     return {
-        "quantidade_total": int(sum(int(item.get("quantidade_pedido") or 0) for item in selected)),
+        "quantidade_total": int(sum(int(item.get("quantidade") or 0) for item in selected)),
         "valor_total": round(sum(float(item.get("valor_total") or 0) for item in selected), 2),
     }
 
@@ -53,7 +60,7 @@ def validate_order(order: dict[str, Any]) -> list[str]:
     if not selected:
         errors.append("Selecione pelo menos 1 item para o pedido.")
 
-    if any(int(item.get("quantidade_pedido") or 0) <= 0 for item in selected):
+    if any(int(item.get("quantidade") or 0) <= 0 for item in selected):
         errors.append("A quantidade de cada item selecionado deve ser maior que zero.")
 
     quote = order.get("quote") or {}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -58,3 +59,18 @@ def basic_document_format_is_valid(value: str, *, kind: str) -> bool:
     if kind == "cnpj":
         return len(digits) == 14
     return False
+
+
+def get_default_logo_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+
+
+def get_logo_source(uploaded_logo: bytes | None = None) -> bytes | None:
+    if uploaded_logo:
+        return uploaded_logo
+
+    default_logo = get_default_logo_path()
+    if default_logo.exists():
+        return default_logo.read_bytes()
+
+    return None
