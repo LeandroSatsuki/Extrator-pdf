@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.streamlit/secrets.toml
+output/
+dist/
+build/
+*.py[cod]
+streamlit*.log
