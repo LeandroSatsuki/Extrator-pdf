@@ -65,7 +65,6 @@ def _default_company_data() -> dict:
         "whatsapp": "",
         "email": "",
         "instagram": "",
-        "site": "",
         "nome_vendedor": "",
         "data_orcamento": date.today(),
         "validade_dias": 7,
@@ -319,10 +318,9 @@ def _render_company_form() -> dict:
         data["telefone"] = col4.text_input("Telefone", value=data.get("telefone", ""))
         data["whatsapp"] = col5.text_input("WhatsApp", value=data.get("whatsapp", ""))
         data["email"] = col6.text_input("Email", value=data.get("email", ""))
-        col7, col8, col9 = st.columns(3)
+        col7, col8 = st.columns(2)
         data["instagram"] = col7.text_input("Instagram", value=data.get("instagram", ""))
-        data["site"] = col8.text_input("Site", value=data.get("site", ""))
-        data["nome_vendedor"] = col9.text_input("Nome do vendedor", value=data.get("nome_vendedor", ""))
+        data["nome_vendedor"] = col8.text_input("Nome do vendedor", value=data.get("nome_vendedor", ""))
 
         default_logo = get_default_logo_path()
         if default_logo.exists() and st.session_state.get("logo") is None:

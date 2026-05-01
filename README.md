@@ -112,7 +112,8 @@ Esse aviso não bloqueia o orçamento.
 O PDF mostra:
 
 - Logo no topo, se existir.
-- Dados da empresa, cliente e condições em linhas simples.
+- Dados da empresa e do cliente em dois blocos lado a lado.
+- Detalhes do orçamento em bloco próprio abaixo do cabeçalho.
 - Tabela com Código, Descrição, Avulso, 2 a 4, 5 a 7, 8 a 19, Acima de 20.
 - Total de modelos orçados.
 
