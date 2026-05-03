@@ -261,7 +261,7 @@ def _order_items_table(items: list[dict[str, Any]]) -> Table:
     styles = _styles()
     header_style = styles["TableHeader"]
     body_style = styles["Small"]
-    header = ["Código", "Descrição", "Qtd.", "Un.", "Métrica", "Preço unit.", "Valor total"]
+    header = ["Código", "Descrição", "Qtd.", "Un.", "Sugestão de Venda", "Preço unit.", "Valor total"]
     data = [[_paragraph(f"<b>{column}</b>", header_style) for column in header]]
     for item in items:
         data.append(
@@ -270,12 +270,12 @@ def _order_items_table(items: list[dict[str, Any]]) -> Table:
                 _paragraph(item.get("descricao"), body_style),
                 _paragraph(item.get("quantidade"), body_style),
                 _paragraph(item.get("unidade"), body_style),
-                _paragraph(item.get("metrica_aplicada"), body_style),
+                _paragraph(format_brl(item.get("preco_avulso")), body_style),
                 _paragraph(format_brl(item.get("preco_unitario")), body_style),
                 _paragraph(format_brl(item.get("valor_total")), body_style),
             ]
         )
-    return build_items_table(data, [2.1 * cm, 5.5 * cm, 1.1 * cm, 1.0 * cm, 2.0 * cm, 2.4 * cm, 2.6 * cm])
+    return build_items_table(data, [2.1 * cm, 5.1 * cm, 1.1 * cm, 1.0 * cm, 2.8 * cm, 2.3 * cm, 2.5 * cm])
 
 
 def _build_document(title: str, number: str, story: list[Any]) -> BytesIO:
@@ -332,7 +332,7 @@ def build_order_pdf(order_data: dict[str, Any], logo_file: bytes | None = None) 
     story.append(Spacer(1, 0.3 * cm))
     story.append(_paragraph(f"<b>Quantidade total do pedido:</b> {totals.get('quantidade_total', 0)}", styles["Line"]))
     story.append(_paragraph(f"<b>Valor total avulso:</b> {format_brl(totals.get('valor_total_avulso', 0))}", styles["Line"]))
-    story.append(_paragraph(f"<b>Desconto {safe_text(totals.get('metrica_desconto'))}:</b> {format_brl(totals.get('desconto_quantidade', 0))}", styles["Line"]))
+    story.append(_paragraph(f"<b>Desconto do pedido:</b> {format_brl(totals.get('desconto_quantidade', 0))}", styles["Line"]))
     story.append(_paragraph(f"<b>Valor total do pedido:</b> {format_brl(totals.get('valor_total', 0))}", styles["Line"]))
     story.append(Spacer(1, 0.5 * cm))
     story.append(_paragraph("<b>Assinatura do cliente:</b> ______________________________________", styles["Line"]))
