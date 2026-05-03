@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from .pricing import calculate_metric_prices
+from .pricing import MARKUP_KEYS, calculate_metric_prices
 from .utils import basic_document_format_is_valid, safe_text
 
 
@@ -86,15 +86,16 @@ def validate_quote(
     if not selected_items:
         errors.append("Adicione pelo menos 1 item ao orçamento.")
 
-    for key, label in {
+    labels = {
         "acrescimo_avulso": "Acréscimo Avulso",
-        "acrescimo_2_a_4": "Acréscimo 2 a 4",
-        "acrescimo_5_a_7": "Acréscimo 5 a 7",
-        "acrescimo_8_a_19": "Acréscimo 8 a 19",
-        "acrescimo_acima_20": "Acréscimo Acima de 20",
-    }.items():
+        "acrescimo_3_pecas": "Acréscimo 3 peças",
+        "acrescimo_5_pecas": "Acréscimo 5 peças",
+        "acrescimo_10_pecas": "Acréscimo 10 peças",
+        "acrescimo_20_pecas_alto_atacado": "Acréscimo 20 peças - alto atacado",
+    }
+    for key in MARKUP_KEYS:
         if percentages.get(key) is None:
-            errors.append(f"Preencha o campo {label}.")
+            errors.append(f"Preencha o campo {labels[key]}.")
 
     return errors
 

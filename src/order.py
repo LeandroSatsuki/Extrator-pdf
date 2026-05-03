@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .pricing import calculate_item_total, get_metric_by_total_quantity, get_metric_label, get_price_by_metric
+from .pricing import (
+    calculate_item_total,
+    get_discount_metric_label,
+    get_metric_by_total_quantity,
+    get_metric_label,
+    get_price_by_metric,
+)
 
 
 def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
@@ -16,15 +22,16 @@ def create_order_from_quote(quote: dict[str, Any]) -> list[dict[str, Any]]:
             "metrica_aplicada": "Avulso",
             "preco_unitario": item.get("preco_avulso", 0),
             "valor_total": item.get("preco_avulso", 0),
+            "valor_se_avulso": item.get("preco_avulso", 0),
             "observacao": item.get("observacao", ""),
             "valor_custo_base": item.get("valor_custo_base", 0),
             "valor_unitario_original": item.get("valor_unitario_original", 0),
             "valor_base_original": item.get("valor_base_original", 0),
             "preco_avulso": item.get("preco_avulso", 0),
-            "preco_2_a_4": item.get("preco_2_a_4", 0),
-            "preco_5_a_7": item.get("preco_5_a_7", 0),
-            "preco_8_a_19": item.get("preco_8_a_19", 0),
-            "preco_acima_20": item.get("preco_acima_20", 0),
+            "preco_3_pecas": item.get("preco_3_pecas", item.get("preco_2_a_4", 0)),
+            "preco_5_pecas": item.get("preco_5_pecas", item.get("preco_5_a_7", 0)),
+            "preco_10_pecas": item.get("preco_10_pecas", item.get("preco_8_a_19", 0)),
+            "preco_20_pecas_alto_atacado": item.get("preco_20_pecas_alto_atacado", item.get("preco_acima_20", 0)),
         }
         for item in quote.get("items", [])
     ]
@@ -43,6 +50,7 @@ def recalculate_order_items(items: list[dict[str, Any]], percentages: dict[str, 
         updated["metrica_aplicada"] = metric_label if item.get("selecionar") else ""
         updated["preco_unitario"] = applied_price
         updated["valor_total"] = calculate_item_total(quantity, applied_price)
+        updated["valor_se_avulso"] = calculate_item_total(quantity, item.get("preco_avulso"))
         recalculated.append(updated)
     return recalculated
 
@@ -51,10 +59,21 @@ def calculate_order_totals(items: list[dict[str, Any]]) -> dict[str, float | int
     selected = [item for item in items if item.get("selecionar")]
     total_quantity = int(sum(int(item.get("quantidade") or 0) for item in selected))
     metric_key = get_metric_by_total_quantity(total_quantity) if total_quantity > 0 else ""
+    total_value = round(sum(float(item.get("valor_total") or 0) for item in selected), 2)
+    total_avulso = round(
+        sum(calculate_item_total(item.get("quantidade"), item.get("preco_avulso")) for item in selected),
+        2,
+    )
+    raw_discount = round(total_avulso - total_value, 2)
+    discount = round(max(raw_discount, 0), 2)
     return {
         "quantidade_total": total_quantity,
         "metrica_aplicada": get_metric_label(metric_key),
-        "valor_total": round(sum(float(item.get("valor_total") or 0) for item in selected), 2),
+        "metrica_desconto": get_discount_metric_label(metric_key),
+        "valor_total_avulso": total_avulso,
+        "desconto_quantidade": discount,
+        "observacao_desconto": "Desconto negativo ajustado para R$ 0,00." if raw_discount < 0 else "",
+        "valor_total": total_value,
     }
 
 

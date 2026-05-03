@@ -16,7 +16,7 @@ from src.persistence import (
 )
 from src.pdf_writer import build_order_pdf, build_quote_pdf
 from src.pricing import MARKUP_KEYS, markup_sequence_has_warning
-from src.product_base import build_product_base, find_products_by_code
+from src.product_base import build_product_base, format_product_option, normalize_product_code, search_products
 from src.quote import calculate_quote_totals, create_quote_item, recalculate_quote_items, validate_quote
 from src.utils import (
     configure_file_logging,
@@ -45,12 +45,11 @@ QUOTE_DISPLAY_COLUMNS = [
     "peso_g",
     "unidade",
     "classificacao",
-    "valor_custo_base",
     "preco_avulso",
-    "preco_2_a_4",
-    "preco_5_a_7",
-    "preco_8_a_19",
-    "preco_acima_20",
+    "preco_3_pecas",
+    "preco_5_pecas",
+    "preco_10_pecas",
+    "preco_20_pecas_alto_atacado",
     "observacao",
 ]
 
@@ -63,8 +62,11 @@ ORDER_DISPLAY_COLUMNS = [
     "metrica_aplicada",
     "preco_unitario",
     "valor_total",
+    "valor_se_avulso",
     "observacao",
 ]
+
+IMPORT_PREVIEW_HIDDEN_COLUMNS = {"valor_base", "percentual", "valor_unitario", "valor_total"}
 
 
 def _default_company_data() -> dict:
@@ -83,10 +85,10 @@ def _default_customer_data() -> dict:
 def _default_markups() -> dict:
     return {
         "acrescimo_avulso": 80.0,
-        "acrescimo_2_a_4": 70.0,
-        "acrescimo_5_a_7": 60.0,
-        "acrescimo_8_a_19": 50.0,
-        "acrescimo_acima_20": 40.0,
+        "acrescimo_3_pecas": 70.0,
+        "acrescimo_5_pecas": 60.0,
+        "acrescimo_10_pecas": 50.0,
+        "acrescimo_20_pecas_alto_atacado": 40.0,
     }
 
 
@@ -94,12 +96,13 @@ def _normalize_percentages(value: dict | None) -> dict:
     value = value or {}
     if all(key in value for key in MARKUP_KEYS):
         return {key: float(value.get(key) or 0) for key in MARKUP_KEYS}
+    defaults = _default_markups()
     legacy = {
-        "acrescimo_avulso": value.get("1_3", 80.0),
-        "acrescimo_2_a_4": value.get("4_6", 70.0),
-        "acrescimo_5_a_7": value.get("7_9", 60.0),
-        "acrescimo_8_a_19": value.get("acima_10", 50.0),
-        "acrescimo_acima_20": 40.0,
+        "acrescimo_avulso": value.get("acrescimo_avulso", value.get("1_3", defaults["acrescimo_avulso"])),
+        "acrescimo_3_pecas": value.get("acrescimo_3_pecas", value.get("acrescimo_2_a_4", value.get("4_6", defaults["acrescimo_3_pecas"]))),
+        "acrescimo_5_pecas": value.get("acrescimo_5_pecas", value.get("acrescimo_5_a_7", value.get("7_9", defaults["acrescimo_5_pecas"]))),
+        "acrescimo_10_pecas": value.get("acrescimo_10_pecas", value.get("acrescimo_8_a_19", value.get("acima_10", defaults["acrescimo_10_pecas"]))),
+        "acrescimo_20_pecas_alto_atacado": value.get("acrescimo_20_pecas_alto_atacado", value.get("acrescimo_acima_20", defaults["acrescimo_20_pecas_alto_atacado"])),
     }
     return {key: float(legacy.get(key) or 0) for key in MARKUP_KEYS}
 
@@ -254,21 +257,6 @@ def _logo_bytes() -> bytes | None:
     return get_logo_source(st.session_state.get("logo"))
 
 
-def _format_product_option(product: dict) -> str:
-    try:
-        weight_value = product.get("peso_g")
-        weight = f"{float(weight_value):.2f}".replace(".", ",") if weight_value not in (None, "") else ""
-    except (TypeError, ValueError):
-        weight = ""
-    classification = product.get("classificacao") or ""
-    weight_text = f"{weight}g" if weight else "peso não informado"
-    classification_text = f"Classificação {classification}" if classification else "Classificação não informada"
-    return (
-        f"{product.get('produto', '')} - {product.get('descricao', '')} - "
-        f"{weight_text} - {product.get('unidade', '')} - {classification_text}"
-    )
-
-
 def _render_edit_quote_button(location: str) -> None:
     if st.button("Editar orçamento / Refazer orçamento", key=f"edit_quote_{location}"):
         st.session_state["orcamento_confirmado"] = False
@@ -287,14 +275,14 @@ def _render_edit_quote_button(location: str) -> None:
 
 def _money_columns_config() -> dict:
     return {
-        "valor_custo_base": st.column_config.NumberColumn("Custo base", format="R$ %.2f"),
         "preco_avulso": st.column_config.NumberColumn("Avulso", format="R$ %.2f"),
-        "preco_2_a_4": st.column_config.NumberColumn("2 a 4", format="R$ %.2f"),
-        "preco_5_a_7": st.column_config.NumberColumn("5 a 7", format="R$ %.2f"),
-        "preco_8_a_19": st.column_config.NumberColumn("8 a 19", format="R$ %.2f"),
-        "preco_acima_20": st.column_config.NumberColumn("Acima de 20", format="R$ %.2f"),
+        "preco_3_pecas": st.column_config.NumberColumn("3 peças", format="R$ %.2f"),
+        "preco_5_pecas": st.column_config.NumberColumn("5 peças", format="R$ %.2f"),
+        "preco_10_pecas": st.column_config.NumberColumn("10 peças", format="R$ %.2f"),
+        "preco_20_pecas_alto_atacado": st.column_config.NumberColumn("20 peças (alto atacado)", format="R$ %.2f"),
         "preco_unitario": st.column_config.NumberColumn("Preço unitário", format="R$ %.2f"),
         "valor_total": st.column_config.NumberColumn("Valor total", format="R$ %.2f"),
+        "valor_se_avulso": st.column_config.NumberColumn("Valor se avulso", format="R$ %.2f"),
     }
 
 
@@ -358,7 +346,8 @@ def _render_import_tab() -> None:
     if items_df.empty:
         st.info("Nenhuma linha de item foi extraída dos PDFs selecionados.")
     else:
-        st.dataframe(items_df, width="stretch", hide_index=True)
+        preview_columns = [column for column in items_df.columns if column not in IMPORT_PREVIEW_HIDDEN_COLUMNS]
+        st.dataframe(items_df[preview_columns], width="stretch", hide_index=True)
 
     confirmed = st.checkbox("Conferi a prévia e confirmo a geração da planilha Excel")
     col_confirm, col_download = st.columns(2)
@@ -477,10 +466,10 @@ def _render_percentages() -> dict:
         st.caption("Os percentuais abaixo são acréscimos sobre o custo da base, não descontos.")
         col1, col2, col3, col4, col5 = st.columns(5)
         percentages["acrescimo_avulso"] = col1.number_input("Acréscimo Avulso (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_avulso", 0)))
-        percentages["acrescimo_2_a_4"] = col2.number_input("Acréscimo 2 a 4 (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_2_a_4", 0)))
-        percentages["acrescimo_5_a_7"] = col3.number_input("Acréscimo 5 a 7 (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_5_a_7", 0)))
-        percentages["acrescimo_8_a_19"] = col4.number_input("Acréscimo 8 a 19 (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_8_a_19", 0)))
-        percentages["acrescimo_acima_20"] = col5.number_input("Acréscimo Acima de 20 (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_acima_20", 0)))
+        percentages["acrescimo_3_pecas"] = col2.number_input("Acréscimo 3 peças (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_3_pecas", 0)))
+        percentages["acrescimo_5_pecas"] = col3.number_input("Acréscimo 5 peças (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_5_pecas", 0)))
+        percentages["acrescimo_10_pecas"] = col4.number_input("Acréscimo 10 peças (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_10_pecas", 0)))
+        percentages["acrescimo_20_pecas_alto_atacado"] = col5.number_input("Acréscimo 20 peças - alto atacado (%)", min_value=0.0, step=0.5, value=float(percentages.get("acrescimo_20_pecas_alto_atacado", 0)))
         if markup_sequence_has_warning(percentages):
             st.warning("Atenção: normalmente o acréscimo diminui conforme a quantidade aumenta.")
 
@@ -496,11 +485,13 @@ def _render_product_search(percentages: dict) -> None:
     col_code, col_search = st.columns([3, 1])
     code = col_code.text_input(
         "Código do item",
-        help="Digite o código completo ou os 5 últimos dígitos.",
+        help="Digite o código completo, os 5 últimos dígitos ou pelo menos 4 números do código.",
         key="codigo_busca_produto",
     )
-    if col_search.button("Buscar item"):
-        matches = find_products_by_code(st.session_state["base_produtos"], code)
+    normalized_code = normalize_product_code(code)
+    search_clicked = col_search.button("Buscar item")
+    if len(normalized_code) >= 4 or search_clicked:
+        matches = search_products(st.session_state["base_produtos"], code)
         st.session_state["produtos_encontrados"] = matches
         if not matches:
             st.session_state["produto_encontrado"] = None
@@ -511,14 +502,17 @@ def _render_product_search(percentages: dict) -> None:
             st.success("Produto encontrado.")
         else:
             st.session_state["produto_encontrado"] = None
+    elif not normalized_code:
+        st.session_state["produtos_encontrados"] = []
+        st.session_state["produto_encontrado"] = None
 
     matches = st.session_state.get("produtos_encontrados") or []
     if len(matches) > 1:
-        st.info("Foram encontrados vários produtos com esses 5 últimos dígitos. Selecione o item correto.")
+        st.info("Foram encontrados vários produtos com esse código. Selecione o item correto.")
         selected_index = st.selectbox(
             "Produtos encontrados",
             options=list(range(len(matches))),
-            format_func=lambda index: _format_product_option(matches[index]),
+            format_func=lambda index: format_product_option(matches[index]),
             key="produto_ambiguo_selecionado",
         )
         product = matches[selected_index]
@@ -542,12 +536,11 @@ def _render_product_search(percentages: dict) -> None:
                     "Peso": format_weight(preview["peso_g"]),
                     "Unidade": preview["unidade"],
                     "Classificação": preview["classificacao"],
-                    "Custo base": format_brl(preview["valor_custo_base"]),
                     "Avulso": format_brl(preview["preco_avulso"]),
-                    "2 a 4": format_brl(preview["preco_2_a_4"]),
-                    "5 a 7": format_brl(preview["preco_5_a_7"]),
-                    "8 a 19": format_brl(preview["preco_8_a_19"]),
-                    "Acima de 20": format_brl(preview["preco_acima_20"]),
+                    "3 peças": format_brl(preview["preco_3_pecas"]),
+                    "5 peças": format_brl(preview["preco_5_pecas"]),
+                    "10 peças": format_brl(preview["preco_10_pecas"]),
+                    "20 peças (alto atacado)": format_brl(preview["preco_20_pecas_alto_atacado"]),
                     "Observação": preview["observacao"],
                 }
             ]
@@ -612,7 +605,7 @@ def _render_quote_tab() -> None:
 
     st.header("Orçamento")
     base = st.session_state["base_produtos"]
-    st.caption(f"Base temporária: {len(base)} produto(s). O custo da base vem do valor_unitario_original; se ausente, usa valor_base_original.")
+    st.caption(f"Base temporária: {len(base)} produto(s) disponível(is) para orçamento.")
     st.info("Os valores são calculados por métrica. No pedido, a métrica será aplicada conforme a quantidade total de itens selecionados.")
 
     company_data = _render_company_form()
@@ -695,13 +688,16 @@ def _render_order_tab() -> None:
     if not st.session_state["itens_pedido"]:
         st.session_state["itens_pedido"] = recalculate_order_items(create_order_from_quote(quote_data), quote_data["percentages"])
 
+    if any(column not in item for item in st.session_state["itens_pedido"] for column in ORDER_DISPLAY_COLUMNS):
+        st.session_state["itens_pedido"] = recalculate_order_items(st.session_state["itens_pedido"], quote_data["percentages"])
+
     items = st.session_state["itens_pedido"]
     df = pd.DataFrame(items)
     edited = st.data_editor(
         df[ORDER_DISPLAY_COLUMNS],
         width="stretch",
         hide_index=True,
-        disabled=["produto", "descricao", "unidade", "metrica_aplicada", "preco_unitario", "valor_total", "observacao"],
+        disabled=["produto", "descricao", "unidade", "metrica_aplicada", "preco_unitario", "valor_total", "valor_se_avulso", "observacao"],
         column_config={
             "selecionar": st.column_config.CheckboxColumn("Selecionar"),
             "produto": st.column_config.TextColumn("Código"),
@@ -764,8 +760,9 @@ def _render_order_tab() -> None:
         st.warning("Você alterou quantidades do pedido. Confirme as alterações para continuar.")
 
     totals = calculate_order_totals(st.session_state["itens_pedido"])
-    col_qty, col_total = st.columns(2)
+    col_qty, col_avulso, col_total = st.columns(3)
     col_qty.metric("Quantidade total do pedido", totals["quantidade_total"])
+    col_avulso.metric("Valor total avulso", format_brl(totals.get("valor_total_avulso", 0)))
     col_total.metric("Valor total do pedido", format_brl(totals["valor_total"]))
     st.metric("Métrica aplicada ao pedido", totals.get("metrica_aplicada") or "-")
 

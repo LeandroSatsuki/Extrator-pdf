@@ -12,7 +12,7 @@ O app usa extração determinística com `pdfplumber`, regex e validações. Nã
 - Cálculo de confiança por linha extraída.
 - Excel com abas `Itens` e `Resumo`.
 - Base temporária de produtos consolidada por código.
-- Orçamento por métricas: `Avulso`, `2 a 4`, `5 a 7`, `8 a 19`, `Acima de 20`.
+- Orçamento por métricas: `Avulso`, `3 peças`, `5 peças`, `10 peças`, `20 peças (alto atacado)`.
 - Acréscimos configuráveis sobre o custo da base.
 - PDF de orçamento com tabela por métrica, sem quantidade.
 - Pedido gerado a partir do orçamento, com quantidade, métrica global aplicada e total.
@@ -126,17 +126,17 @@ Para adicionar item:
 As métricas do orçamento são:
 
 - Avulso
-- 2 a 4
-- 5 a 7
-- 8 a 19
-- Acima de 20
+- 3 peças
+- 5 peças
+- 10 peças
+- 20 peças (alto atacado)
 
-Os percentuais são acréscimos sobre o custo da base, não descontos. O custo usa preferencialmente `valor_unitario_original`; se ausente, usa `valor_base_original`.
+Os percentuais são acréscimos sobre o custo interno da base, não descontos. Esse custo não é exibido ao usuário final, mas continua sendo usado internamente para calcular os preços por métrica.
 
 Fórmula:
 
 ```text
-preço da métrica = valor_custo_base * (1 + percentual_acrescimo / 100)
+preço da métrica = custo interno * (1 + percentual_acrescimo / 100)
 ```
 
 Se uma faixa maior tiver acréscimo maior que a faixa anterior, o app mostra o aviso:
@@ -154,7 +154,7 @@ O PDF mostra:
 - Logo no topo, se existir.
 - Dados da empresa e do cliente em dois blocos lado a lado.
 - Detalhes do orçamento em bloco próprio abaixo do cabeçalho.
-- Tabela com Código, Descrição, Avulso, 2 a 4, 5 a 7, 8 a 19, Acima de 20.
+- Tabela com Código, Descrição, Avulso, 3 peças, 5 peças, 10 peças, 20 peças.
 - Total de modelos orçados.
 
 O PDF do orçamento não mostra quantidade, preço aplicado nem valor total geral.
@@ -168,13 +168,15 @@ Na tabela do pedido:
 - Selecione os itens.
 - Informe ou altere a quantidade.
 - O sistema soma as quantidades de todos os itens selecionados e aplica a mesma métrica para todos:
-  - total 1: Avulso
-  - total 2 a 4: preço 2 a 4
-  - total 5 a 7: preço 5 a 7
-  - total 8 a 19: preço 8 a 19
-  - total 20 ou mais: Acima de 20
+  - total 1 ou 2: Avulso
+  - total 3 ou 4: preço 3 peças
+  - total 5 a 9: preço 5 peças
+  - total 10 a 19: preço 10 peças
+  - total 20 ou mais: preço 20 peças (alto atacado)
 
 Se qualquer quantidade for alterada, o app bloqueia a confirmação e o PDF do pedido até clicar em `Confirmar alterações de quantidade`.
+
+Na tela do pedido, a coluna `Valor se avulso` mostra apenas uma comparação informativa. O PDF do pedido mostra o valor total avulso, o desconto pela métrica aplicada e o valor final do pedido.
 
 ## Editar orçamento
 

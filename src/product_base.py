@@ -86,7 +86,7 @@ def normalize_product_code(value: Any) -> str:
     return re.sub(r"\D", "", str(value or "").strip())
 
 
-def find_products_by_code(product_base: pd.DataFrame, search_code: str) -> list[dict[str, Any]]:
+def search_products(product_base: pd.DataFrame, search_code: str) -> list[dict[str, Any]]:
     if product_base.empty:
         return []
 
@@ -95,18 +95,43 @@ def find_products_by_code(product_base: pd.DataFrame, search_code: str) -> list[
         return []
 
     product_codes = product_base["produto"].astype(str).map(normalize_product_code)
-    matches = product_base[product_codes.eq(normalized)]
-    if matches.empty and len(normalized) == 5:
-        matches = product_base[product_codes.str.endswith(normalized, na=False)]
+    masks = [product_codes.eq(normalized)]
+    if len(normalized) == 5:
+        masks.append(product_codes.str.endswith(normalized, na=False))
+    if len(normalized) >= 4:
+        masks.append(product_codes.str.contains(normalized, regex=False, na=False))
 
+    combined_mask = masks[0]
+    for mask in masks[1:]:
+        combined_mask = combined_mask | mask
+
+    matches = product_base[combined_mask].drop_duplicates(subset=["produto"], keep="first")
     if matches.empty:
         return []
 
     return matches.to_dict("records")
 
 
+def find_products_by_code(product_base: pd.DataFrame, search_code: str) -> list[dict[str, Any]]:
+    return search_products(product_base, search_code)
+
+
 def find_product_by_code(product_base: pd.DataFrame, code: str) -> dict[str, Any] | None:
-    matches = find_products_by_code(product_base, code)
+    matches = search_products(product_base, code)
     if len(matches) != 1:
         return None
     return matches[0]
+
+
+def format_product_option(product: dict[str, Any]) -> str:
+    try:
+        weight_value = product.get("peso_g")
+        weight = f"{float(weight_value):.2f}".replace(".", ",") if weight_value not in (None, "") else ""
+    except (TypeError, ValueError):
+        weight = ""
+    weight_text = f"{weight}g" if weight else "peso não informado"
+    classification = product.get("classificacao") or "não informada"
+    return (
+        f"{product.get('produto', '')} - {product.get('descricao', '')} - "
+        f"{weight_text} - {product.get('unidade', '')} - Classificação {classification}"
+    )

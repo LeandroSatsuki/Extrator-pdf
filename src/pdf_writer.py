@@ -240,7 +240,7 @@ def _quote_items_table(items: list[dict[str, Any]]) -> Table:
     styles = _styles()
     header_style = styles["TableHeader"]
     body_style = styles["Small"]
-    header = ["Código", "Descrição", "Avulso", "2 a 4", "5 a 7", "8 a 19", "Acima de 20"]
+    header = ["Código", "Descrição", "Avulso", "3 peças", "5 peças", "10 peças", "20 peças"]
     data = [[_paragraph(f"<b>{column}</b>", header_style) for column in header]]
     for item in items:
         data.append(
@@ -248,10 +248,10 @@ def _quote_items_table(items: list[dict[str, Any]]) -> Table:
                 _paragraph(item.get("produto"), body_style),
                 _paragraph(item.get("descricao"), body_style),
                 _paragraph(format_brl(item.get("preco_avulso")), body_style),
-                _paragraph(format_brl(item.get("preco_2_a_4")), body_style),
-                _paragraph(format_brl(item.get("preco_5_a_7")), body_style),
-                _paragraph(format_brl(item.get("preco_8_a_19")), body_style),
-                _paragraph(format_brl(item.get("preco_acima_20")), body_style),
+                _paragraph(format_brl(item.get("preco_3_pecas")), body_style),
+                _paragraph(format_brl(item.get("preco_5_pecas")), body_style),
+                _paragraph(format_brl(item.get("preco_10_pecas")), body_style),
+                _paragraph(format_brl(item.get("preco_20_pecas_alto_atacado")), body_style),
             ]
         )
     return build_items_table(data, [2.2 * cm, 5.3 * cm, 1.9 * cm, 1.9 * cm, 1.9 * cm, 1.9 * cm, 2.1 * cm])
@@ -331,7 +331,8 @@ def build_order_pdf(order_data: dict[str, Any], logo_file: bytes | None = None) 
     story.append(_order_items_table(items))
     story.append(Spacer(1, 0.3 * cm))
     story.append(_paragraph(f"<b>Quantidade total do pedido:</b> {totals.get('quantidade_total', 0)}", styles["Line"]))
-    story.append(_paragraph(f"<b>Métrica aplicada ao pedido:</b> {safe_text(totals.get('metrica_aplicada'))}", styles["Line"]))
+    story.append(_paragraph(f"<b>Valor total avulso:</b> {format_brl(totals.get('valor_total_avulso', 0))}", styles["Line"]))
+    story.append(_paragraph(f"<b>Desconto {safe_text(totals.get('metrica_desconto'))}:</b> {format_brl(totals.get('desconto_quantidade', 0))}", styles["Line"]))
     story.append(_paragraph(f"<b>Valor total do pedido:</b> {format_brl(totals.get('valor_total', 0))}", styles["Line"]))
     story.append(Spacer(1, 0.5 * cm))
     story.append(_paragraph("<b>Assinatura do cliente:</b> ______________________________________", styles["Line"]))
